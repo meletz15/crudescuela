@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CRUD ALUMNOS</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+</head>
+<body class="bg-light">
+
+<div class="container mt-5">
+  <h2 class="text-center mb-4">Registro de Alumnos</h2>
+
+  <!-- FORMULARIO -->
+  <form id="formAlumno" class="card p-4 shadow">
+    <input type="hidden" id="idAlumno">
+
+    <div class="row">
+      <div class="col-md-6 mb-3">
+        <label>Nombre</label>
+        <input type="text" id="nombre" class="form-control"
+               required minlength="2"
+               pattern="[A-Za-zÁÉÍÓÚáéíóúÑñ ]+">
+      </div>
+
+      <div class="col-md-6 mb-3">
+        <label>Apellido</label>
+        <input type="text" id="apellido" class="form-control"
+               required minlength="2"
+               pattern="[A-Za-zÁÉÍÓÚáéíóúÑñ ]+">
+      </div>
+
+      <div class="col-md-6 mb-3">
+        <label>Teléfono</label>
+        <input type="text" id="telefono" class="form-control"
+               required pattern="[0-9]{8}">
+      </div>
+
+      <div class="col-md-6 mb-3">
+        <label>Dirección</label>
+        <input type="text" id="direccion" class="form-control"
+               required minlength="5">
+      </div>
+    </div>
+
+    <button class="btn btn-outline-primary" type="submit" id="btnGuardar">Guardar</button>
+    <button class="btn btn-outline-success d-none" type="button" id="btnActualizar">Actualizar</button>
+    <button class="btn btn-outline-secondary d-none" type="button" id="btnCancelar">Cancelar</button>
+  </form>
+
+  <!-- TABLA -->
+  <h3 class="text-center mt-5">Listado de Alumnos</h3>
+
+  <table class="table table-striped mt-3">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Nombre</th>
+        <th>Apellidos</th>
+        <th>Teléfono</th>
+        <th>Dirección</th>
+        <th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody id="tablaBody"></tbody>
+  </table>
+</div>
+
+<script>
+  const API = "http://localhost:3000/alumnos";
+
+  // REFERENCIAS
+  const formAlumno    = document.getElementById("formAlumno");
+  const idAlumno      = document.getElementById("idAlumno");
+  const nombre        = document.getElementById("nombre");
+  const apellido      = document.getElementById("apellido");
+  const telefono      = document.getElementById("telefono");
+  const direccion     = document.getElementById("direccion");
+  const btnGuardar    = document.getElementById("btnGuardar");
+  const btnActualizar = document.getElementById("btnActualizar");
+  const btnCancelar   = document.getElementById("btnCancelar");
+
+  // VALIDACIONES
+  function soloLetrasYEspacios(v) {
+    return /^[A-Za-zÁÉÍÓÚáéíóúÑñ ]+$/.test(v);
+  }
+
+  function telefonoGT(v) {
+    return /^\d{8}$/.test(v);
+  }
+
+  async function validarFormulario() {
+    const n = nombre.value.trim().replace(/\s+/g, " ");
+    const a = apellido.value.trim().replace(/\s+/g, " ");
+    const t = telefono.value.trim();
+    const d = direccion.value.trim().replace(/\s+/g, " ");
+
+    nombre.value = n;
+    apellido.value = a;
+    telefono.value = t;
+    direccion.value = d;
+
+    if (!n || !a || !t || !d) {
+      alert("Todos los campos son obligatorios");
+      return false;
+    }
+
+    if (!soloLetrasYEspacios(n) || n.length < 2) {
+      alert("Nombre inválido");
+      nombre.focus();
+      return false;
+    }
+
+    if (!soloLetrasYEspacios(a) || a.length < 2) {
+      alert("Apellido inválido");
+      apellido.focus();
+      return false;
+    }
+
+    if (!telefonoGT(t)) {
+      alert("Teléfono inválido (8 dígitos)");
+      telefono.focus();
+      return false;
+    }
+
+    if (d.length < 5) {
+      alert("Dirección muy corta");
+      direccion.focus();
+      return false;
+    }
+
+    // DUPLICADOS
+    try {
+      const res = await fetch(API);
+      const alumnos = await res.json();
+      const idActual = idAlumno.value;
+
+      const existe = alumnos.some(x =>
+        String(x.id) !== String(idActual) &&
+        x.nombre.toLowerCase() === n.toLowerCase() &&
+        x.apellido.toLowerCase() === a.toLowerCase()
+      );
+
+      if (existe) {
+        alert("El alumno ya existe");
+        return false;
+      }
+    } catch (e) {
+      console.warn("No se pudo validar duplicados");
+    }
+
+    return true;
+  }
+
+  // CARGAR
+  async function cargarAlumnos() {
+    const res = await fetch(API);
+    const alumnos = await res.json();
+
+    let html = "";
+    alumnos.forEach(a => {
+      const n = JSON.stringify(a.nombre);
+      const ap = JSON.stringify(a.apellido);
+      const t = JSON.stringify(a.telefono);
+      const d = JSON.stringify(a.direccion);
+
+      html += `
+        <tr>
+          <td>${a.id}</td>
+          <td>${a.nombre}</td>
+          <td>${a.apellido}</td>
+          <td>${a.telefono}</td>
+          <td>${a.direccion}</td>
+          <td>
+            <button class="btn btn-warning btn-sm"
+              onclick="editar(${a.id}, ${n}, ${ap}, ${t}, ${d})">
+              Editar
+            </button>
+            <button class="btn btn-danger btn-sm"
+              onclick="eliminarAlumno(${a.id})">
+              Eliminar
+            </button>
+          </td>
+        </tr>`;
+    });
+
+    document.getElementById("tablaBody").innerHTML = html;
+  }
+  cargarAlumnos();
+
+  // GUARDAR
+  formAlumno.addEventListener("submit", async e => {
+    e.preventDefault();
+    if (!(await validarFormulario())) return;
+
+    if (idAlumno.value) {
+      alert("Estás en modo edición");
+      return;
+    }
+
+    const data = {
+      nombre: nombre.value,
+      apellido: apellido.value,
+      telefono: telefono.value,
+      direccion: direccion.value
+    };
+
+    await fetch(API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    });
+
+    formAlumno.reset();
+    cargarAlumnos();
+  });
+
+  // EDITAR
+  function editar(id, n, a, t, d) {
+    idAlumno.value = id;
+    nombre.value = n;
+    apellido.value = a;
+    telefono.value = t;
+    direccion.value = d;
+
+    btnGuardar.classList.add("d-none");
+    btnActualizar.classList.remove("d-none");
+    btnCancelar.classList.remove("d-none");
+  }
+
+  // ACTUALIZAR
+  btnActualizar.addEventListener("click", async () => {
+    if (!(await validarFormulario())) return;
+
+    const id = idAlumno.value;
+
+    await fetch(`${API}/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nombre: nombre.value,
+        apellido: apellido.value,
+        telefono: telefono.value,
+        direccion: direccion.value
+      })
+    });
+
+    idAlumno.value = "";
+    formAlumno.reset();
+    cargarAlumnos();
+
+    btnGuardar.classList.remove("d-none");
+    btnActualizar.classList.add("d-none");
+    btnCancelar.classList.add("d-none");
+  });
+
+  // CANCELAR
+  btnCancelar.addEventListener("click", () => {
+    idAlumno.value = "";
+    formAlumno.reset();
+
+    btnGuardar.classList.remove("d-none");
+    btnActualizar.classList.add("d-none");
+    btnCancelar.classList.add("d-none");
+  });
+
+  // EXPONER PARA onclick
+  window.editar = editar;
+  window.eliminarAlumno = async id => {
+    await fetch(`${API}/${id}`, { method: "DELETE" });
+    cargarAlumnos();
+  };
+</script>
+
+</body>
+</html>
